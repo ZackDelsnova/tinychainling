@@ -142,11 +142,11 @@ struct Block {
 
 	// print block info
 	void print() const {
-		std::cout << "Block " << index << "\n";
-		std::cout << "Timestamp: " << timestamp << "\n";
-		std::cout << "Data: " << data << "\n";
-		std::cout << "Prev Hash: " << prevHash << "\n";
-		std::cout << "Hash: " << hash << "\n";
+		std::cout << "block " << index << "\n";
+		std::cout << "timestamp: " << timestamp << "\n";
+		std::cout << "data: " << data << "\n";
+		std::cout << "prev hash: " << prevHash << "\n";
+		std::cout << "hash: " << hash << "\n";
 		std::cout << "-----------------------------\n\n";
 	}
 
@@ -170,7 +170,7 @@ public:
 
 	// genesis / first block creation
 	Block createGenesisBlock() {
-		return Block(0, "Genesis Block", "0");
+		return Block(0, "GENESIS BLOCK", "0");
 	}
 
 	// get last block
@@ -210,6 +210,21 @@ public:
 		}
 	}
 
+	void tamperBlock(int index, const std::string& newData) {
+		if (index <= 0 || index >= (int)chain.size()) {
+			std::cout << "invalid index, cant tamper with genesis block :(\n";
+			return;
+		}
+
+		Block& blk = chain[index];
+		blk.data = newData;
+
+		blk.hash = blk.calculateHash();
+
+		std::cout << "block " << index << " has been tampered >:)\n";
+		std::cout << "new hash (unmined): " << blk.hash << "\n";
+	}
+
 private:
 	std::vector<Block> chain;
 };
@@ -226,6 +241,7 @@ int main() {
 		std::cout << "2. print blockchain\n";
 		std::cout << "3. validate chain\n";
 		std::cout << "4. exit\n";
+		std::cout << "5. tamper with block\n";
 		std::cout << "choice: ";
 		std::cin >> choice;
 
@@ -244,6 +260,19 @@ int main() {
 			else std::cout << "chain BROKEN :(\n";
 		}
 		else if (choice == 4) break;
+		else if (choice == 5) {
+			int index;
+			std::string newData;
+
+			std::cout << "enter block index to tamper with: ";
+			std::cin >> index;
+			std::cin.ignore();
+
+			std::cout << "enter new FAKE data: ";
+			std::getline(std::cin, newData);
+
+			chain.tamperBlock(index, newData);
+		}
 	}
 
 	return 0;
