@@ -7,6 +7,8 @@
 #include <iomanip>
 #include <cstring>
 
+const int difficulty = 4;
+
 // small sha-256
 class SimpleSHA256 {
 public:
@@ -92,7 +94,7 @@ public:
 				f = e;
 				e = d + temp1;
 				d = c;
-				c = d;
+				c = b;
 				b = a;
 				a = temp1 + temp2;
 			}
@@ -122,11 +124,14 @@ struct Block {
 	std::string data; // data
 	std::string prevHash; // hash of previous block
 	std::string hash; // hash of this block
-	int nonce; // number used for mining
+	int nonce = 0; // number used for mining
 
 	// block initialization
 	Block(int idx, const std::string& d, const std::string& prev) 
-		: index(idx), timestamp(std::time(nullptr)), data(d), prevHash(prev), hash(""), nonce(0) {}
+		: index(idx), timestamp(std::time(nullptr)), data(d), prevHash(prev), nonce(0) {
+		hash = calculateHash();
+		mineBlock();
+	}
 
 	// calculate hash
 	std::string calculateHash() const {
@@ -137,21 +142,24 @@ struct Block {
 
 	// print block info
 	void print() const {
-		std::cout << "Block " << index << " [\n";
-		std::cout << "  Timestamp: " << timestamp << "\n";
-		std::cout << "  Data: " << data << "\n";
-		std::cout << "  PrevHash: " << prevHash << "\n";
-		std::cout << "  Hash: " << hash << "\n";
-		std::cout << "  Nonce: " << nonce << "\n]\n\n";
+		std::cout << "Block " << index << "\n";
+		std::cout << "Timestamp: " << timestamp << "\n";
+		std::cout << "Data: " << data << "\n";
+		std::cout << "Prev Hash: " << prevHash << "\n";
+		std::cout << "Hash: " << hash << "\n";
+		std::cout << "-----------------------------\n\n";
+	}
+
+	void mineBlock() {
+		while (hash.substr(0, difficulty) != std::string(difficulty, '0')) {
+			nonce++;
+			hash = calculateHash();
+		}
 	}
 };
 
 bool isHashValid(const Block& block) {
-	std::stringstream ss;
-	ss << block.index << block.timestamp << block.data << block.prevHash << block.nonce;
-	std::string recalculated = SimpleSHA256::hash(ss.str());
-
-	return recalculated == block.hash;
+	return block.calculateHash() == block.hash;
 }
 
 class Blockchain {
@@ -166,7 +174,7 @@ public:
 	}
 
 	// get last block
-	Block getLastBlock() const {
+	const Block& getLastBlock() const {
 		return chain.back();
 	}
 
@@ -178,7 +186,6 @@ public:
 			data,
 			last.hash
 		);
-
 		chain.push_back(newBlock);
 	}
 
@@ -197,6 +204,12 @@ public:
 		return true;
 	}
 
+	void printChain() const {
+		for (const auto& block : chain) {
+			block.print();
+		}
+	}
+
 private:
 	std::vector<Block> chain;
 };
@@ -205,11 +218,33 @@ int main() {
 	
 	std::cout << "tinychainling started....\n";
 
-	Block genesis(0, "Hello Tinychainling!", "0"); // first block has prevHash = 0
+	Blockchain chain;
+	int choice = 0;
 
-	genesis.hash = genesis.calculateHash();
+	while (true) {
+		std::cout << "1. add block\n";
+		std::cout << "2. print blockchain\n";
+		std::cout << "3. validate chain\n";
+		std::cout << "4. exit\n";
+		std::cout << "choice: ";
+		std::cin >> choice;
 
-	genesis.print();
+		if (choice == 1) {
+			std::string data;
+			std::cout << "enter data: ";
+			std::cin.ignore();
+			std::getline(std::cin, data);
+			chain.addBlock(data);
+		}
+		else if (choice == 2) {
+			chain.printChain();
+		}
+		else if (choice == 3) {
+			if (chain.isChainValid()) std::cout << "chain VALID :)\n";
+			else std::cout << "chain BROKEN :(\n";
+		}
+		else if (choice == 4) break;
+	}
 
 	return 0;
 }
