@@ -7,7 +7,7 @@
 #include <iomanip>
 #include <cstring>
 
-const int difficulty = 4;
+int difficulty = 4;
 
 // small sha-256
 class SimpleSHA256 {
@@ -273,6 +273,7 @@ int main() {
 		std::cout << "4. exit\n";
 		std::cout << "5. tamper with block\n";
 		std::cout << "6. repair chain\n";
+		std::cout << "7. set difficulty\n";
 		std::cout << "choice: ";
 		std::cin >> choice;
 
@@ -306,6 +307,15 @@ int main() {
 		}
 		else if (choice == 6) {
 			chain.repairChain();
+		}
+		else if (choice == 7) {
+			std::cout << "enter new difficulty: ";
+			std::cin >> difficulty;
+
+			if (difficulty < 1) difficulty = 1;
+			if (difficulty > 7) difficulty = 7; // safeguard sha256 gets insane
+
+			std::cout << "difficulty set to: " << difficulty << "\n";
 		}
 	}
 
