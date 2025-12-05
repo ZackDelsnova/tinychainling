@@ -225,6 +225,36 @@ public:
 		std::cout << "new hash (unmined): " << blk.hash << "\n";
 	}
 
+	void repairChain() {
+		std::cout << "\nstarting chain repair.....\n";
+
+		for (size_t i = 1; i < chain.size(); i++) {
+			Block& current = chain[i];
+			Block& previous = chain[i - 1];
+
+			// if link broken or hash doesnt satisfy mining rule
+			if (current.prevHash != previous.hash ||
+				current.hash.substr(0, difficulty) != std::string(difficulty, '0')) {
+				
+				std::cout << "\nrepairing block " << i << "......\n";
+
+				//update previous hash
+				current.prevHash = previous.hash;
+				
+				// remine block
+				current.nonce = 0;
+				current.hash = current.calculateHash();
+
+				std::cout << "mining block " << i << ".......\n";
+				current.mineBlock();
+
+				std::cout << "block " << i << " fixed\n";
+			}
+		}
+
+		std::cout << "\n chain fully repaired :) \n";
+	}
+
 private:
 	std::vector<Block> chain;
 };
@@ -242,6 +272,7 @@ int main() {
 		std::cout << "3. validate chain\n";
 		std::cout << "4. exit\n";
 		std::cout << "5. tamper with block\n";
+		std::cout << "6. repair chain\n";
 		std::cout << "choice: ";
 		std::cin >> choice;
 
@@ -272,6 +303,9 @@ int main() {
 			std::getline(std::cin, newData);
 
 			chain.tamperBlock(index, newData);
+		}
+		else if (choice == 6) {
+			chain.repairChain();
 		}
 	}
 
