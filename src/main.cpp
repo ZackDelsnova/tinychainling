@@ -154,6 +154,53 @@ bool isHashValid(const Block& block) {
 	return recalculated == block.hash;
 }
 
+class Blockchain {
+public:
+	Blockchain() {
+		chain.push_back(createGenesisBlock());
+	}
+
+	// genesis / first block creation
+	Block createGenesisBlock() {
+		return Block(0, "Genesis Block", "0");
+	}
+
+	// get last block
+	Block getLastBlock() const {
+		return chain.back();
+	}
+
+	// add block
+	void addBlock(const std::string& data) {
+		Block last = getLastBlock();
+		Block newBlock(
+			last.index + 1,
+			data,
+			last.hash
+		);
+
+		chain.push_back(newBlock);
+	}
+
+	bool isChainValid() const {
+		for (size_t i = 1; i < chain.size(); ++i) {
+			const Block& current = chain[i];
+			const Block& previous = chain[i - 1];
+
+			if (!isHashValid(current))
+				return false;
+
+			if (current.prevHash != previous.hash)
+				return false;
+		}
+
+		return true;
+	}
+
+private:
+	std::vector<Block> chain;
+};
+
 int main() {
 	
 	std::cout << "tinychainling started....\n";
