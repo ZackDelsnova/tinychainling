@@ -1,13 +1,20 @@
+// other normal useful requirements
 #include <iostream>
 #include <string>
 #include <ctime>
 
+// hashing and block chain stuff
 #include <vector>
 #include <sstream>
 #include <iomanip>
 #include <cstring>
 
 int difficulty = 4;
+
+// networking stuff
+#include <WinSock2.h>
+#include <WS2tcpip.h>
+#pragma comment(lib, "ws2_32.lib")
 
 // small sha-256
 class SimpleSHA256 {
@@ -118,6 +125,29 @@ private:
 	}
 };
 
+struct Transaction {
+	std::string source; // sender
+	std::string destination; // receiver
+	int sacrifice; // amt
+	int fate_likelihood; // randomness
+	std::time_t contact_time; // timestamp
+
+	std::string toString() const {
+		std::stringstream ss;
+		ss << source << destination << sacrifice << fate_likelihood << contact_time;
+		return ss.str();
+	}
+
+	void print() const {
+		std::cout << "  source: " << source << "\n";
+		std::cout << "  destination: " << destination << "\n";
+		std::cout << "  sacrifice: " << sacrifice << "\n";
+		std::cout << "  fate likelihood: " << fate_likelihood << "\n";
+		std::cout << "  contact time: " << contact_time << "\n";
+		std::cout << "----------------------------\n";
+	}
+};
+
 struct Block {
 	int index; // index of the block as its name suggests
 	std::time_t timestamp; // time of creation
@@ -125,18 +155,22 @@ struct Block {
 	std::string prevHash; // hash of previous block
 	std::string hash; // hash of this block
 	int nonce = 0; // number used for mining
+	std::vector<Transaction> transactions; // list of transaction
 
 	// block initialization
 	Block(int idx, const std::string& d, const std::string& prev) 
 		: index(idx), timestamp(std::time(nullptr)), data(d), prevHash(prev), nonce(0) {
 		hash = calculateHash();
-		mineBlock();
 	}
 
 	// calculate hash
 	std::string calculateHash() const {
 		std::stringstream ss;
 		ss << index << timestamp << data << prevHash << nonce;
+		
+		for (const auto& t : transactions)
+			ss << t.toString();
+
 		return SimpleSHA256::hash(ss.str());
 	}
 
@@ -148,6 +182,13 @@ struct Block {
 		std::cout << "prev hash: " << prevHash << "\n";
 		std::cout << "hash: " << hash << "\n";
 		std::cout << "-----------------------------\n\n";
+		if (!transactions.empty()) {
+			std::cout << " transactions: \n";
+			for (const auto& t : transactions) {
+				std::cout << "    - ";
+				t.print();
+			}
+		}
 	}
 
 	void mineBlock() {
@@ -186,6 +227,13 @@ public:
 			data,
 			last.hash
 		);
+
+		for (int i = 0; i < maxTxPerBlock && !mempool.empty(); i++) {
+			newBlock.transactions.push_back(mempool.front());
+			mempool.erase(mempool.begin());
+		}
+
+		newBlock.mineBlock();
 		chain.push_back(newBlock);
 	}
 
@@ -255,9 +303,101 @@ public:
 		std::cout << "\n chain fully repaired :) \n";
 	}
 
+	void addTransaction() {
+		int mode;
+		std::cout << "1. manual transaction\n";
+		std::cout << "2. automatic transaction\n";
+		std::cout << "choice: ";
+		std::cin >> mode;
+		std::cin.ignore();
+
+		Transaction t;
+
+		if (mode == 1) {
+			// manual
+			std::cout << "enter source: ";
+			std::getline(std::cin, t.source);
+
+			std::cout << "enter destination: ";
+			std::getline(std::cin, t.destination);
+
+			std::cout << "enter sacrifice: ";
+			std::cin >> t.sacrifice;
+
+			std::cout << "enter fate likelihood: ";
+			std::cin >> t.fate_likelihood;
+
+			t.contact_time = std::time(nullptr);
+		}
+		else {
+			// auto
+			t.source = "mage_" + std::to_string(rand() % 1000);
+			t.destination = "altar_" + std::to_string(rand() % 500);
+			t.sacrifice = (rand() % 100) + 1;
+			t.fate_likelihood = (rand() % 9000) + 100;
+			t.contact_time = std::time(nullptr);
+
+			std::cout << "auto-generated transaction complete\n";
+		}
+
+		mempool.push_back(t);
+	}
+
+	std::vector<Transaction> mempool; // waiting list
+	int maxTxPerBlock = 5; // block size limit for transaction
+
 private:
 	std::vector<Block> chain;
 };
+
+// server
+void startServer() {
+	WSADATA wsaData;
+	WSAStartup(MAKEWORD(2, 2), &wsaData);
+
+	SOCKET serverSocket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+	if (serverSocket == INVALID_SOCKET) {
+		std::cout << "socket failed\n";
+		return;
+	}
+
+	sockaddr_in serverAddr{};
+	serverAddr.sin_family = AF_INET;
+	serverAddr.sin_addr.s_addr = INADDR_ANY;
+	serverAddr.sin_port = htons(5000);
+
+	if (bind(serverSocket, (sockaddr*)&serverAddr, sizeof(serverAddr)) == SOCKET_ERROR) {
+		std::cout << "bind failed\n";
+		closesocket(serverSocket);
+		return;
+	}
+
+	if (listen(serverSocket, 1) == SOCKET_ERROR) {
+		std::cout << "listen failed\n";
+		closesocket(serverSocket);
+		return;
+	}
+
+	std::cout << "server listening on port 5000...........\n";
+
+	SOCKET clientSocket = accept(serverSocket, nullptr, nullptr);
+	if (clientSocket == INVALID_SOCKET) {
+		std::cout << "accept failed\n";
+		closesocket(serverSocket);
+		return;
+	}
+
+	std::cout << "client connected\n";
+
+	char buffer[1024] = {};
+	int bytesReceived = recv(clientSocket, buffer, sizeof(buffer), 0);
+
+	std::cout << "received: " << buffer << std::endl;
+
+	closesocket(clientSocket);
+	closesocket(serverSocket);
+	WSACleanup();
+}
 
 int main() {
 	
@@ -274,6 +414,9 @@ int main() {
 		std::cout << "5. tamper with block\n";
 		std::cout << "6. repair chain\n";
 		std::cout << "7. set difficulty\n";
+		std::cout << "8. add transaction\n";
+		std::cout << "9. print mempool\n";
+		std::cout << "10. start server\n";
 		std::cout << "choice: ";
 		std::cin >> choice;
 
@@ -316,6 +459,18 @@ int main() {
 			if (difficulty > 7) difficulty = 7; // safeguard sha256 gets insane
 
 			std::cout << "difficulty set to: " << difficulty << "\n";
+		}
+		else if (choice == 8) {
+			chain.addTransaction();
+		}
+		else if (choice == 9) {
+			for (const auto& t : chain.mempool) {
+				t.print();
+			}
+		}
+		else if (choice == 10) {
+			std::cout << "starting magical server.........\n";
+			startServer();
 		}
 	}
 
